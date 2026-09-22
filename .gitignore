@@ -1,0 +1,7 @@
+.env
+.dev.env
+.uat.env
+.env.*
+!.env.example
+
+node_modules/

@@ -1,0 +1,22 @@
+{
+  "name": "saraha-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "cross-env NODE_ENV=prod node .",
+    "start:dev": "cross-env NODE_ENV=dev nodemon .",
+    "start:uat": "cross-env NODE_ENV=uat nodemon ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "argon2": "^0.45.1",
+    "cross-env": "^10.1.0",
+    "dotenv": "^18.0.1",
+    "express": "^5.2.1",
+    "mongoose": "^9.10.1"
+  }
+}
