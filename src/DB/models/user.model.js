@@ -39,7 +39,7 @@ const userSchema = new Schema(
       max: [90, "Age must be at most 90"],
     },
     profilePicture: String,
-    phoneNumber: String,
+    phone: String,
   },
   {
     timestamps: true,

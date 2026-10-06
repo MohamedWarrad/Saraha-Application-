@@ -21,8 +21,16 @@ class BaseRepository {
     return this.model.findOne(filters);
   }
 
+  findAllDocuments(filters = {}) {
+    return this.model.find(filters);
+  }
+
   findOneAndUpdateDocument(filters, updates, options) {
     return this.model.findOneAndUpdate(filters, updates, options);
+  }
+
+  findOneAndDeleteDocument(filters, options) {
+    return this.model.findOneAndDelete(filters, options);
   }
 }
 
