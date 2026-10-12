@@ -1,9 +1,5 @@
 import { model, Schema } from "mongoose";
-
-export const genders = {
-  male: "male",
-  female: "female",
-};
+import { genderEnum, roleEnum } from "../../common/utils/constants.js";
 
 const userSchema = new Schema(
   {
@@ -32,14 +28,23 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
-    gender: { type: String, enum: Object.values(genders) },
+    gender: {
+      type: String,
+      enum: Object.values(genderEnum),
+      default: genderEnum.MALE,
+    },
     age: {
       type: Number,
       min: [18, "Age must be at least 18"],
       max: [90, "Age must be at most 90"],
     },
+    role: {
+      type: String,
+      enum: Object.values(roleEnum),
+      default: roleEnum.USER,
+    },
     profilePicture: String,
-    phone: String,
+    phoneNumber: String,
   },
   {
     timestamps: true,

@@ -11,3 +11,15 @@ export class ConflictException extends HttpAppError {
     super(message, 409, data, code);
   }
 }
+
+export class NotFoundException extends HttpAppError {
+  constructor(message = "Not found", data = {}, code = "NOT_FOUND") {
+    super(message, 404, data, code);
+  }
+}
+
+export class UnauthorizedException extends HttpAppError {
+  constructor(message = "Unauthorized", data = {}, code = "UNAUTHORIZED") {
+    super(message, 401, data, code);
+  }
+}

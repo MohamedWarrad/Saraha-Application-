@@ -1,16 +1,11 @@
-import { isValidObjectId } from "mongoose";
-import User from "../../DB/models/user.model.js";
-import { decrypt } from "../../utils/security/encryption.security.js";
+import { decrypt } from "../../common/utils/security/encryption.security.js";
 import UserRepository from "../../DB/repositories/user.repository.js";
 
 const userRepo = new UserRepository();
 
 // profile
-export const profile = async (id) => {
-  const user = await userRepo.findDocumentById(id).select("-password");
-
+export const profile = async (user) => {
   if (user.phoneNumber) user.phoneNumber = decrypt(user.phoneNumber);
-
   return user;
 };
 

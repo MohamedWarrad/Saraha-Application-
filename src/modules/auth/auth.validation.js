@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { genders } from "../../DB/models/user.model.js";
+import { genderEnum } from "../../common/utils/constants.js";
 
 // login schema
 export const loginSchema = z.strictObject({
@@ -20,9 +20,9 @@ export const registerSchema = loginSchema
   .extend({
     firstName: z.string().min(3).max(30),
     lastName: z.string().min(3).max(30),
-    gender: z.enum(Object.values(genders)).default(genders.male),
+    gender: z.enum(Object.values(genderEnum)).default(genderEnum.MALE),
     age: z.number().min(18, { error: "Age must be at least 18" }).max(90),
-    phone: z.string().regex(/^(002|\+2)01[0125][0-9]{8}$/, {
+    phoneNumber: z.string().regex(/^(002|\+2)01[0125][0-9]{8}$/, {
       error: "Provide a valid EG number",
     }),
     confirmPassword: z.string(),
