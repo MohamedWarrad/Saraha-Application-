@@ -1,5 +1,9 @@
 import { model, Schema } from "mongoose";
-import { genderEnum, roleEnum } from "../../common/utils/constants.js";
+import {
+  genderEnum,
+  providersEnum,
+  roleEnum,
+} from "../../common/utils/constants.js";
 
 const userSchema = new Schema(
   {
@@ -45,6 +49,18 @@ const userSchema = new Schema(
     },
     profilePicture: String,
     phoneNumber: String,
+    googleSub: {
+      type: String,
+      index: {
+        name: "idx_google_sub_unique",
+        unique: true,
+      },
+    },
+    provider: {
+      type: String,
+      enum: Object.values(providersEnum),
+      default: providersEnum.SYSTEM,
+    },
   },
   {
     timestamps: true,

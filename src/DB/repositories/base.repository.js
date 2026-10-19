@@ -29,6 +29,10 @@ class BaseRepository {
     return this.model.findOneAndUpdate(filters, updates, options);
   }
 
+  findByIdAndUpdate(_id, updates, options) {
+    return this.model.findByIdAndUpdate(_id, updates, options);
+  }
+
   findOneAndDeleteDocument(filters, options) {
     return this.model.findOneAndDelete(filters, options);
   }

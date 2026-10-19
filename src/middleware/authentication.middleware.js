@@ -18,13 +18,13 @@ export const authenticate = (tokenType = tokenTypeEnum.ACCESS_TOKEN) => {
       throw new BadRequestException("invalid authorization header format");
     }
 
-    const user = await decodeToken({
+    const { user, decodedData } = await decodeToken({
       token,
       tokenType,
     });
 
     req.user = user;
-    // req.payload = decodedData;
+    req.payload = decodedData;
     next();
   };
 };

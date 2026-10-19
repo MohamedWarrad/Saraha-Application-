@@ -1,12 +1,20 @@
 import jwt from "jsonwebtoken";
-import { BadRequestException } from "../errors/exception.error.js";
+import {
+  BadRequestException,
+  UnauthorizedException,
+} from "../errors/exception.error.js";
 import envConfig from "../../../config/env.config.js";
 import UserRepository from "../../../DB/repositories/user.repository.js";
 import { tokenTypeEnum } from "../constants.js";
+import { exist } from "../../services/cache.service.js";
 
 const jwtConfig = envConfig.jwt;
 
 const userRepo = new UserRepository();
+
+export const userRevokeTokenKey = ({ userId, jti }) => {
+  return `Saraha::User::${userId}::Revoke_Token::${jti}`;
+};
 
 export const generateToken = (payload = {}, secret = "", option = {}) => {
   return jwt.sign(payload, secret, option);
@@ -61,5 +69,17 @@ export const decodeToken = async ({ token, tokenType }) => {
   if (!user) {
     throw new BadRequestException("User not found");
   }
-  return user;
+
+  if (
+    await exist({
+      key: userRevokeTokenKey({
+        userId: user._id.toString(),
+        jti: decodedData.jti,
+      }),
+    })
+  ) {
+    throw new UnauthorizedException("Expired login credentials");
+  }
+
+  return { user, decodedData };
 };

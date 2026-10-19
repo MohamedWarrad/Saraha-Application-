@@ -4,12 +4,14 @@ import authRouter from "./modules/auth/auth.controller.js";
 import messageRouter from "./modules/message/message.controller.js";
 import userRouter from "./modules/user/user.controller.js";
 
+import cors from "cors";
+
 const bootstrap = async (app, express) => {
   // db connected
   await connectDB();
 
   // parse body
-  app.use(express.json());
+  app.use(cors(), express.json());
 
   // router middleware
   //   app.get("/", (req, res) => res.json("healthy router"));
