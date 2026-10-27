@@ -12,6 +12,16 @@ export class ConflictException extends HttpAppError {
   }
 }
 
+export class TooManyRequestException extends HttpAppError {
+  constructor(
+    message = "Too Many Request Exception",
+    data = {},
+    code = "Too_Many_Request",
+  ) {
+    super(message, 409, data, code);
+  }
+}
+
 export class NotFoundException extends HttpAppError {
   constructor(message = "Not found", data = {}, code = "NOT_FOUND") {
     super(message, 404, data, code);

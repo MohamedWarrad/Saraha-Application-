@@ -3,6 +3,11 @@ import * as userService from "./user.service.js";
 import { authenticate } from "../../middleware/authentication.middleware.js";
 import { authorize } from "../../middleware/authorization.middleware.js";
 import { roleEnum } from "../../common/utils/constants.js";
+import {
+  allowedExtension,
+  multerUpload,
+  processFile,
+} from "../../middleware/multer.middleware.js";
 const userRouter = Router();
 
 // profile
@@ -44,5 +49,26 @@ userRouter.delete("/delete", authenticate(), async (req, res, next) => {
     .status(200)
     .json({ success: true, message: "Document deleted successfully", data });
 });
+
+// profile-image
+userRouter.patch(
+  "/profile-image",
+  authenticate(),
+  multerUpload({
+    desiredPath: "profile",
+    validation: allowedExtension.image,
+  }).single("attachment"),
+  processFile({ validation: allowedExtension.image }),
+  async (req, res, next) => {
+    req.user.profilePicture = req.file.path;
+    await req.user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Uploaded successfully",
+      data: { user: req.user },
+    });
+  },
+);
 
 export default userRouter;

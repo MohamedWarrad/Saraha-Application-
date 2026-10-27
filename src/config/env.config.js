@@ -37,6 +37,15 @@ const envConfig = {
   redis: {
     url: process.env.REDIS_CLOUD_URI,
   },
+  email: {
+    APP_EMAIL: process.env.APP_EMAIL,
+    APP_PASSWORD: process.env.APP_PASSWORD,
+  },
+  social_media: {
+    FACEBOOK: process.env.FACEBOOK,
+    INSTAGRAM: process.env.INSTAGRAM,
+    TWITTER: process.env.TWITTER,
+  },
 };
 
 export default envConfig;

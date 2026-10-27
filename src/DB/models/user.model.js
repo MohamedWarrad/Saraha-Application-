@@ -61,6 +61,12 @@ const userSchema = new Schema(
       enum: Object.values(providersEnum),
       default: providersEnum.SYSTEM,
     },
+    confirmEmail: Date,
+    changeCredentialsTime: Date,
+    twoStepVerification: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

@@ -1,6 +1,7 @@
 import "./src/config/env.config.js";
 import express from "express";
 import bootstrap from "./src/app.js";
+import { sendEmail } from "./src/common/utils/email/send.email.js";
 const app = express();
 
 await bootstrap(app, express);

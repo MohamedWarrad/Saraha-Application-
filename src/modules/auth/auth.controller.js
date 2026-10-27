@@ -28,7 +28,9 @@ authRouter.post(
     const data = await authService.login({ email, password });
     return res.status(200).json({
       success: true,
-      message: "User logged in successfully.",
+      message: data.requiresTwoStepVerification
+        ? "OTP sent successfully"
+        : "User logged in successfully.",
       data,
     });
   },
@@ -91,5 +93,116 @@ authRouter.post("/logout", authenticate(), async (req, res, next) => {
     data,
   });
 });
+
+// Confirm Email
+authRouter.patch(
+  "/confirm-email",
+  validation(validators.confirmEmail),
+  async (req, res) => {
+    const data = await authService.confirmEmail(req.body);
+    return res.status(200).json({
+      success: true,
+      message: "Confirmed Successfully",
+      data,
+    });
+  },
+);
+
+// resend Confirm Email
+authRouter.patch(
+  "/resend-confirm-email",
+  validation(validators.resendConfirmEmail),
+  async (req, res) => {
+    const data = await authService.resendConfirmEmail(req.body);
+    return res.status(200).json({
+      success: true,
+      message: "OTP send Successfully",
+      data,
+    });
+  },
+);
+
+// request forgot password code
+authRouter.post(
+  "/request-forgot-password-code",
+  validation(validators.resendConfirmEmail),
+  async (req, res) => {
+    const data = await authService.requestForgotPasswordCode(req.body);
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  },
+);
+
+// verify Forgot Password Code
+authRouter.post(
+  "/verify-forgot-password",
+  validation(validators.confirmEmail),
+  async (req, res) => {
+    const data = await authService.verifyForgotPasswordCode(req.body);
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  },
+);
+
+// reset Forgot Password Code
+authRouter.patch(
+  "/reset-forgot-password",
+  validation(validators.resetForgotPassword),
+  async (req, res) => {
+    const data = await authService.resetForgotPassword(req.body);
+    return res.status(200).json({
+      success: true,
+      message: "Password Updated Successfully",
+      data,
+    });
+  },
+);
+
+// confirm login
+authRouter.post(
+  "/confirm-login",
+  validation(validators.confirmEmail),
+  async (req, res) => {
+    const data = await authService.confirmLogin(req.body);
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  },
+);
+
+// enableTwoStepVerification
+authRouter.post(
+  "/enable-two-step-verification",
+  authenticate(),
+  async (req, res) => {
+    const data = await authService.enableTwoStepVerification(req.user);
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  },
+);
+
+// verifyTwoStepVerification
+authRouter.patch(
+  "/verify-two-step-verification",
+  authenticate(),
+  validation(validators.verifyTwoStepVerification),
+  async (req, res) => {
+    const data = await authService.verifyTwoStepVerification(
+      req.user,
+      req.body,
+    );
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  },
+);
 
 export default authRouter;

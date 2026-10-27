@@ -41,3 +41,45 @@ export const registerSchema = loginSchema
 export const register = z.object({
   body: registerSchema,
 });
+
+// confirm Email
+export const confirmEmail = z.object({
+  body: z.strictObject({
+    email: z.email({ error: "Provide valid email format" }),
+    otp: z.string().regex(/^\d{6}$/, { error: "invalid code" }),
+  }),
+});
+
+// resend confirm Email
+export const resendConfirmEmail = z.object({
+  body: z.strictObject({
+    email: z.email({ error: "Provide valid email format" }),
+  }),
+});
+
+// reset Forgot Password
+export const resetForgotPassword = z.object({
+  body: z
+    .strictObject({
+      email: z.email({ error: "Provide valid email format" }),
+      otp: z.string().regex(/^\d{6}$/, { error: "invalid code" }),
+      password: z.string().min(6).max(16),
+      confirmPassword: z.string(),
+    })
+    .refine(
+      (data) => {
+        return data.password == data.confirmPassword;
+      },
+      {
+        message: "Password and confirmPassword mismatch",
+        path: ["confirmPassword"],
+      },
+    ),
+});
+
+// verify Two-Step Verification
+export const verifyTwoStepVerification = z.object({
+  body: z.strictObject({
+    otp: z.string().regex(/^\d{6}$/, { error: "invalid code" }),
+  }),
+});

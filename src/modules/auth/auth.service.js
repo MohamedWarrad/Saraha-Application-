@@ -3,6 +3,7 @@ import UserRepository from "../../DB/repositories/user.repository.js";
 import {
   BadRequestException,
   ConflictException,
+  TooManyRequestException,
 } from "../../common/utils/errors/exception.error.js";
 import { encrypt } from "../../common/utils/security/encryption.security.js";
 import {
@@ -14,15 +15,75 @@ import {
   getRoleJwtConfig,
   userRevokeTokenKey,
 } from "../../common/utils/security/token.security.js";
-import { providersEnum } from "../../common/utils/constants.js";
+import {
+  EmailSubjectEnum,
+  providersEnum,
+  UserLoginAttemptsKey,
+  UserLoginBlockedKey,
+} from "../../common/utils/constants.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
-import { set } from "../../common/services/cache.service.js";
+import {
+  del,
+  expire,
+  get,
+  incrBy,
+  keys,
+  set,
+  ttl,
+} from "../../common/services/cache.service.js";
+import {
+  sendEmail,
+  UserEmailKey,
+  UserEmailTrialsKey,
+} from "../../common/utils/email/send.email.js";
+import { createOtpNumber } from "../../common/utils/otp.js";
+import { emailEvent } from "../../common/utils/email/email.event.js";
 
 const userRepo = new UserRepository();
 
 // const {user: userEnvConfig, admin: adminEnvConfig} = envConfig.jwt.user
 const userEnvConfig = envConfig.jwt.user;
+
+const sendEmailOtp = async ({ email, subject }) => {
+  const existOTP_TTL = await ttl({ key: UserEmailKey({ email, subject }) });
+
+  if (existOTP_TTL > 0) {
+    throw new ConflictException(
+      `Sorry we cannot create new OTP while existing one stil valid please try again later after ${existOTP_TTL}s`,
+    );
+  }
+
+  const oldTrails =
+    (await get({ key: UserEmailTrialsKey({ email, subject }) })) ?? 0;
+  if (oldTrails >= 3) {
+    throw new TooManyRequestException("Max OTP trials has been reached");
+  }
+
+  const code = createOtpNumber();
+  await set({
+    key: UserEmailKey({ email, subject }),
+    value: await hash(code.toString()),
+    ttl: 120,
+  });
+
+  const currentTrials = await incrBy({
+    key: UserEmailTrialsKey({ email, subject }),
+  });
+  if (currentTrials == 3) {
+    await expire({
+      key: UserEmailTrialsKey({ email, subject }),
+      ttl: 300,
+    });
+  }
+
+  // send email
+  emailEvent.emit("sendEmail", {
+    recipients: { to: email },
+    subject,
+    data: { code },
+  });
+};
 
 export const register = async (body) => {
   const { firstName, lastName, email, password, gender, age, phoneNumber } =
@@ -45,6 +106,9 @@ export const register = async (body) => {
   // console.log(encryptedPhone);
 
   const hashedPassword = await hash(password);
+
+  // send email
+  await sendEmailOtp({ email, subject: EmailSubjectEnum.CONFIRM_EMAIL });
 
   // create user
   return userRepo.createDocument({
@@ -76,21 +140,170 @@ const createTokenCredentials = (user) => {
   return { accessToken, refreshToken };
 };
 
-export const login = async ({ email, password }) => {
-  // const user = await userRepo.findUserByEmail(email);
-  const user = await userRepo.findOneDocument({
-    email,
-    provider: providersEnum.SYSTEM,
+const checkLoginBlock = async (userId) => {
+  const blockedKey = UserLoginBlockedKey({ userId });
+
+  const isBlocked = await get({
+    key: blockedKey,
   });
-  if (!user) throw new BadRequestException("Invalid email or password");
+
+  if (isBlocked) {
+    const remainingSeconds = await ttl({
+      key: blockedKey,
+    });
+
+    throw new TooManyRequestException(
+      `Too many failed login attempts. Try again in ${remainingSeconds} seconds`,
+    );
+  }
+};
+
+const verifyLoginPassword = async ({ user, password }) => {
+  const attemptsKey = UserLoginAttemptsKey({
+    userId: user._id,
+  });
+
+  const blockedKey = UserLoginBlockedKey({
+    userId: user._id,
+  });
 
   const isPasswordMatched = await compareHash(user.password, password);
 
-  if (!isPasswordMatched)
+  if (!isPasswordMatched) {
+    const currentAttempts = await incrBy({
+      key: attemptsKey,
+    });
+
+    if (currentAttempts >= 5) {
+      await set({
+        key: blockedKey,
+        value: "1",
+        ttl: 300,
+      });
+
+      await del({
+        key: [attemptsKey],
+      });
+
+      throw new TooManyRequestException(
+        "Too many failed login attempts. Try again after 5 minutes",
+      );
+    }
+
     throw new BadRequestException("Invalid email or password");
+  }
+
+  await del({
+    key: [attemptsKey],
+  });
+};
+
+export const login = async ({ email, password }) => {
+  const user = await userRepo.findOneDocument({
+    email,
+    provider: providersEnum.SYSTEM,
+    confirmEmail: { $exists: true },
+  });
+
+  if (!user) {
+    throw new BadRequestException("Invalid email or password");
+  }
+
+  await checkLoginBlock(user._id);
+
+  await verifyLoginPassword({
+    user,
+    password,
+  });
+
+  if (user.twoStepVerification) {
+    await sendEmailOtp({
+      email,
+      subject: EmailSubjectEnum.LOGIN_2FA,
+    });
+
+    return {
+      requiresTwoStepVerification: true,
+    };
+  }
 
   return createTokenCredentials(user);
 };
+
+// export const login = async ({ email, password }) => {
+//   const user = await userRepo.findOneDocument({
+//     email,
+//     provider: providersEnum.SYSTEM,
+//     confirmEmail: { $exists: true },
+//   });
+
+//   if (!user) {
+//     throw new BadRequestException("Invalid email or password");
+//   }
+
+//   const attemptsKey = UserLoginAttemptsKey({
+//     userId: user._id,
+//   });
+
+//   const blockedKey = UserLoginBlockedKey({
+//     userId: user._id,
+//   });
+
+//   const isBlocked = await get({
+//     key: blockedKey,
+//   });
+
+//   if (isBlocked) {
+//     const remainingSeconds = await ttl({
+//       key: blockedKey,
+//     });
+
+//     throw new TooManyRequestException(
+//       `Too many failed login attempts try again in ${remainingSeconds} s`,
+//     );
+//   }
+
+//   const isPasswordMatched = await compareHash(user.password, password);
+
+//   if (!isPasswordMatched) {
+//     const currentAttempts = await incrBy({
+//       key: attemptsKey,
+//     });
+
+//     if (currentAttempts >= 5) {
+//       await set({
+//         key: blockedKey,
+//         value: "1",
+//         ttl: 300,
+//       });
+
+//       await del({ key: [attemptsKey] });
+
+//       throw new TooManyRequestException(
+//         "Too many failed login attempts try again after 5 minutes",
+//       );
+//     }
+
+//     throw new BadRequestException("Invalid email or password");
+//   }
+
+//   await del({
+//     key: [attemptsKey],
+//   });
+
+//   if (user.twoStepVerification) {
+//     await sendEmailOtp({
+//       email,
+//       subject: EmailSubjectEnum.LOGIN_2FA,
+//     });
+
+//     return {
+//       requiresTwoStepVerification: true,
+//     };
+//   }
+
+//   return createTokenCredentials(user);
+// };
 
 export const rotateToken = async (user) => {
   const roleEnvConfig = getRoleJwtConfig(user.role);
@@ -185,4 +398,185 @@ export const logout = async (payload, user) => {
   });
 
   // console.log({ now, refreshExpiresAt, ttl });
+};
+
+// confirm email
+export const confirmEmail = async ({ email, otp }) => {
+  const user = await userRepo.findOneDocument({
+    email,
+    provider: providersEnum.SYSTEM,
+    confirmEmail: { $exists: false },
+  });
+  if (!user) throw new BadRequestException("Invalid email or password");
+
+  const hashOTP = await get({
+    key: UserEmailKey({ email, subject: EmailSubjectEnum.CONFIRM_EMAIL }),
+  });
+  if (!hashOTP || !(await compareHash(hashOTP, otp))) {
+    throw new BadRequestException("Invalid OTP");
+  }
+
+  user.confirmEmail = new Date();
+  await user.save();
+
+  await del({
+    key: await keys({
+      prefix: UserEmailKey({ email, subject: EmailSubjectEnum.CONFIRM_EMAIL }),
+    }),
+  });
+  return;
+};
+
+// resendConfirm Email
+export const resendConfirmEmail = async ({ email }) => {
+  const user = await userRepo.findOneDocument({
+    email,
+    provider: providersEnum.SYSTEM,
+    confirmEmail: { $exists: false },
+  });
+  if (!user) throw new BadRequestException("Invalid email or password");
+
+  await sendEmailOtp({ email, subject: EmailSubjectEnum.CONFIRM_EMAIL });
+  return;
+};
+
+// requestForgotPasswordCode
+export const requestForgotPasswordCode = async ({ email }) => {
+  const user = await userRepo.findOneDocument({
+    email,
+    provider: providersEnum.SYSTEM,
+    confirmEmail: { $exists: true },
+  });
+  if (!user) throw new BadRequestException("Invalid email or password");
+
+  await sendEmailOtp({ email, subject: EmailSubjectEnum.FORGOT_PASSWORD });
+  return;
+};
+
+// verifyForgotPasswordCode
+export const verifyForgotPasswordCode = async ({ email, otp }) => {
+  const user = await userRepo.findOneDocument({
+    email,
+    provider: providersEnum.SYSTEM,
+    confirmEmail: { $exists: true },
+  });
+  if (!user) throw new BadRequestException("Invalid email or password");
+
+  const hashOTP = await get({
+    key: UserEmailKey({ email, subject: EmailSubjectEnum.FORGOT_PASSWORD }),
+  });
+  if (!hashOTP || !(await compareHash(hashOTP, otp))) {
+    throw new BadRequestException("Invalid OTP");
+  }
+
+  return user;
+};
+
+// resetForgotPassword
+export const resetForgotPassword = async ({ email, otp, password }) => {
+  const account = await verifyForgotPasswordCode({ email, otp });
+  account.password = await hash(password);
+  account.changeCredentialsTime = new Date();
+  await account.save();
+
+  await del({
+    key: await keys({
+      prefix: UserEmailKey({
+        email,
+        subject: EmailSubjectEnum.FORGOT_PASSWORD,
+      }),
+    }),
+  });
+
+  return;
+};
+
+// confitm login
+export const confirmLogin = async ({ email, otp }) => {
+  const user = await userRepo.findOneDocument({
+    email,
+    provider: providersEnum.SYSTEM,
+    confirmEmail: { $exists: true },
+  });
+  if (!user) throw new BadRequestException("Invalid email or password");
+
+  if (!user.twoStepVerification) {
+    throw new BadRequestException("Two-step verification is not enabled");
+  }
+
+  const hashOTP = await get({
+    key: UserEmailKey({ email, subject: EmailSubjectEnum.LOGIN_2FA }),
+  });
+  if (!hashOTP || !(await compareHash(hashOTP, otp))) {
+    throw new BadRequestException("Invalid OTP");
+  }
+
+  await del({
+    key: await keys({
+      prefix: UserEmailKey({
+        email,
+        subject: EmailSubjectEnum.LOGIN_2FA,
+      }),
+    }),
+  });
+
+  return createTokenCredentials(user);
+};
+
+// enableTwoStepVerification
+export const enableTwoStepVerification = async ({ email }) => {
+  const user = await userRepo.findOneDocument({
+    email,
+    provider: providersEnum.SYSTEM,
+    confirmEmail: { $exists: true },
+  });
+  if (!user) throw new BadRequestException("Invalid email or password");
+
+  if (user.twoStepVerification) {
+    throw new ConflictException("Two-step verification is already enabled");
+  }
+
+  await sendEmailOtp({
+    email,
+    subject: EmailSubjectEnum.ENABLE_TWO_STEP_VERIFICATION,
+  });
+  return { message: "OTP sent successfully" };
+};
+
+// verifyTwoStepVerification
+export const verifyTwoStepVerification = async ({ email }, { otp }) => {
+  const user = await userRepo.findOneDocument({
+    email,
+    provider: providersEnum.SYSTEM,
+    confirmEmail: { $exists: true },
+  });
+  if (!user) throw new BadRequestException("Invalid email or password");
+
+  if (user.twoStepVerification) {
+    throw new ConflictException("Two-step verification is already enabled");
+  }
+
+  const hashOTP = await get({
+    key: UserEmailKey({
+      email,
+      subject: EmailSubjectEnum.ENABLE_TWO_STEP_VERIFICATION,
+    }),
+  });
+  if (!hashOTP || !(await compareHash(hashOTP, otp))) {
+    throw new BadRequestException("Invalid OTP");
+  }
+
+  user.twoStepVerification = true;
+  await user.save();
+
+  await del({
+    key: await keys({
+      prefix: UserEmailKey({
+        email,
+        subject: EmailSubjectEnum.ENABLE_TWO_STEP_VERIFICATION,
+      }),
+    }),
+  });
+
+  return true;
 };

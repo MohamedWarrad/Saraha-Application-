@@ -70,6 +70,10 @@ export const decodeToken = async ({ token, tokenType }) => {
     throw new BadRequestException("User not found");
   }
 
+  if ((user.changeCredentialsTime?.getTime() ?? 0) > decodedData.iat * 1000) {
+    throw new UnauthorizedException("Expired login credentials");
+  }
+
   if (
     await exist({
       key: userRevokeTokenKey({
