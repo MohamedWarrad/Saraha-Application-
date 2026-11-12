@@ -26,13 +26,13 @@ export const multerUpload = ({ desiredPath = "general", validation = [] }) => {
 
   function fileFilter(req, file, cb) {
     if (validation.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(
-        new BadRequestException("Invalid file extension", null, "MULTER_ERROR"),
-        false,
-      );
+      return cb(null, true);
     }
+
+    return cb(
+      new BadRequestException("Invalid file extension", null, "MULTER_ERROR"),
+      false,
+    );
   }
 
   return multer({ fileFilter, storage });
@@ -40,6 +40,10 @@ export const multerUpload = ({ desiredPath = "general", validation = [] }) => {
 
 export const processFile = ({ validation = [] }) => {
   return async (req, res, next) => {
+    if (!req.file) {
+      return next();
+    }
+
     const result = await fileTypeFromFile(req.file.path);
 
     if (!result || !validation.includes(result.mime)) {

@@ -3,8 +3,9 @@ import { globalErrorHandling } from "./middleware/global.error.middleware.js";
 import authRouter from "./modules/auth/auth.controller.js";
 import messageRouter from "./modules/message/message.controller.js";
 import userRouter from "./modules/user/user.controller.js";
-
+import helmet from "helmet";
 import cors from "cors";
+import { generateLimiter } from "./common/utils/limiter.js";
 
 const bootstrap = async (app, express) => {
   app.use("/uploads", express.static("./uploads"));
@@ -12,8 +13,11 @@ const bootstrap = async (app, express) => {
   // db connected
   await connectDB();
 
+  app.set("trust proxy", true);
+  // const limiter = generateLimiter({});
+
   // parse body
-  app.use(cors(), express.json());
+  app.use(helmet(), cors(), express.json());
 
   // router middleware
   //   app.get("/", (req, res) => res.json("healthy router"));

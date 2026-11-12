@@ -10,11 +10,11 @@ class BaseRepository {
     return this.model.create(data);
   }
 
-  findDocumentById(_id) {
-    if (!isValidObjectId(_id))
+  findDocumentById(id) {
+    if (!isValidObjectId(id))
       throw new Error("Invalid ObjectId", { cause: { status: 400 } });
 
-    return this.model.findById(_id);
+    return this.model.findById(id);
   }
 
   findOneDocument(filters = {}) {

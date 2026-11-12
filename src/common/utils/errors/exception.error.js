@@ -33,3 +33,8 @@ export class UnauthorizedException extends HttpAppError {
     super(message, 401, data, code);
   }
 }
+export class ForbiddenException extends HttpAppError {
+  constructor(message = "Forbidden", data = {}, code = "FORBIDDEN") {
+    super(message, 403, data, code);
+  }
+}
